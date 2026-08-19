@@ -2,44 +2,49 @@ import streamlit as st
 from openai import OpenAI
 
 st.title("💬 Chatbot")
-st.caption("🚀 A chatbot powered by DeepSeek")
-
-if "deepseek_api_key" not in st.session_state:
-    st.session_state["deepseek_api_key"] = ""
+st.caption("🚀 基于火山方舟 · DeepSeek 的聊天机器人")
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
-        {"role": "assistant", "content": "你好！我是 DeepSeek 聊天机器人，有什么可以帮你？"}
+        {"role": "assistant", "content": "你好！我是人工智能助手，有什么可以帮你？"}
     ]
+
+# ✅ 从 Streamlit Secrets 读密钥，绝不写死在代码里
+api_key = st.secrets.get("ARK_API_KEY", "")
 
 with st.sidebar:
     st.header("⚙️ 设置")
-    api_key = st.text_input("DeepSeek API Key", type="password")
     if api_key:
-        st.session_state["deepseek_api_key"] = api_key
-    model = st.selectbox("模型", ["deepseek-chat", "deepseek-reasoner"])
-    st.markdown("[去获取 DeepSeek API Key](https://platform.deepseek.com/api_keys)")
+        st.success("已读取 API Key（来自 Secrets）")
+    else:
+        st.warning("未配置 ARK_API_KEY，请在 Streamlit Secrets 中设置")
+    model = st.selectbox(
+        "模型",
+        ["deepseek-v4-flash-ga-260731"],  # 你在方舟里实际可用的模型 ID
+    )
+    st.markdown("[去火山方舟获取 API Key](https://console.volcengine.com/ark)")
 
 for msg in st.session_state["messages"]:
     st.chat_message(msg["role"]).write(msg["content"])
 
 if prompt := st.chat_input("说点什么..."):
-    if not st.session_state["deepseek_api_key"]:
-        st.info("请先在左侧填入你的 DeepSeek API Key。", icon="🔑")
+    if not api_key:
+        st.info("请先在 Streamlit Secrets 中配置 ARK_API_KEY。", icon="🔑")
         st.stop()
 
-    # ✅ 改动1+2：base_url 指向 DeepSeek（OpenAI 兼容地址）
+    # ✅ base_url 指向火山方舟的 OpenAI 兼容地址
     client = OpenAI(
-        api_key=st.session_state["deepseek_api_key"],
-        base_url="https://api.deepseek.com",
+        api_key=api_key,
+        base_url="https://ark.cn-beijing.volces.com/api/v3",
     )
 
     st.session_state["messages"].append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
 
     response = client.chat.completions.create(
-        model=model,  # ✅ 改动3：模型名换成 deepseek 的
-        messages=st.session_state["messages"],
+        model=model,
+        messages=[{"role": "system", "content": "你是人工智能助手."}]
+                 + st.session_state["messages"],
         stream=True,
     )
 
